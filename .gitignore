@@ -1,0 +1,12 @@
+cache/
+out/
+node_modules/
+.env
+.env.*
+!.env.example
+broadcast/
+lcov.info
+*.swp
+*.swo
+.DS_Store
+lib/

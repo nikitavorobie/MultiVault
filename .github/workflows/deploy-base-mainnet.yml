@@ -1,0 +1,59 @@
+name: Deploy to Base Mainnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "DEPLOY" to confirm mainnet deployment'
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy Contracts to Mainnet
+    runs-on: ubuntu-latest
+    environment: base-mainnet
+
+    steps:
+      - name: Validate confirmation
+        if: github.event.inputs.confirm != 'DEPLOY'
+        run: |
+          echo "Deployment cancelled. Confirmation required."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Deploy contracts
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+          BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
+        run: |
+          forge script script/Deploy.s.sol:DeployScript \
+            --rpc-url $BASE_MAINNET_RPC_URL \
+            --broadcast \
+            --verify \
+            -vvvv
+
+      - name: Save deployment artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: mainnet-deployment
+          path: broadcast/
+
+      - name: Create deployment record
+        run: |
+          echo "Deployment completed at $(date)" >> deployment-log.txt
+          echo "Network: Base Mainnet" >> deployment-log.txt
+
+      - name: Commit deployment log
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update mainnet deployment log"
+          file_pattern: deployment-log.txt

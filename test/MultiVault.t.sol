@@ -80,18 +80,19 @@ contract MultiVaultTest is Test {
 
     function testCreateProposal() public {
         vm.prank(signer1);
-        uint256 proposalId = vault.createProposal(recipient, 1 ether, "");
+        uint256 proposalId = vault.createProposal(recipient, 1 ether, address(0), "");
 
         IMultiVault.Proposal memory proposal = vault.getProposal(proposalId);
         assertEq(proposal.recipient, recipient);
         assertEq(proposal.amount, 1 ether);
+        assertEq(proposal.token, address(0));
         assertEq(proposal.approvalWeight, 0);
         assertFalse(proposal.executed);
     }
 
     function testApproveProposal() public {
         vm.prank(signer1);
-        uint256 proposalId = vault.createProposal(recipient, 1 ether, "");
+        uint256 proposalId = vault.createProposal(recipient, 1 ether, address(0), "");
 
         vm.prank(signer1);
         vault.approveProposal(proposalId);
@@ -102,7 +103,7 @@ contract MultiVaultTest is Test {
 
     function testExecuteProposal() public {
         vm.prank(signer1);
-        uint256 proposalId = vault.createProposal(recipient, 1 ether, "");
+        uint256 proposalId = vault.createProposal(recipient, 1 ether, address(0), "");
 
         vm.prank(signer2);
         vault.approveProposal(proposalId);
@@ -123,7 +124,7 @@ contract MultiVaultTest is Test {
 
     function testCannotExecuteWithoutThreshold() public {
         vm.prank(signer1);
-        uint256 proposalId = vault.createProposal(recipient, 1 ether, "");
+        uint256 proposalId = vault.createProposal(recipient, 1 ether, address(0), "");
 
         vm.prank(signer1);
         vault.approveProposal(proposalId);
@@ -135,7 +136,7 @@ contract MultiVaultTest is Test {
 
     function testCancelProposal() public {
         vm.prank(signer1);
-        uint256 proposalId = vault.createProposal(recipient, 1 ether, "");
+        uint256 proposalId = vault.createProposal(recipient, 1 ether, address(0), "");
 
         vm.prank(owner);
         vault.cancelProposal(proposalId);

@@ -12,6 +12,7 @@ interface IMultiVault {
         uint256 id;
         address recipient;
         uint256 amount;
+        address token;
         bytes data;
         uint256 approvalWeight;
         uint256 createdAt;
@@ -33,7 +34,7 @@ interface IMultiVault {
     function updateSignerWeight(address signer, uint256 newWeight) external;
     function updateThreshold(uint256 newThreshold) external;
 
-    function createProposal(address recipient, uint256 amount, bytes calldata data) external returns (uint256);
+    function createProposal(address recipient, uint256 amount, address token, bytes calldata data) external returns (uint256);
     function approveProposal(uint256 proposalId) external;
     function executeProposal(uint256 proposalId) external;
     function cancelProposal(uint256 proposalId) external;

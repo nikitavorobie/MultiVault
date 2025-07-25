@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./interfaces/IMultiVault.sol";
 
 contract MultiVault is
@@ -12,6 +14,7 @@ contract MultiVault is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable
 {
+    using SafeERC20Upgradeable for IERC20Upgradeable;
     mapping(address => Signer) private signers;
     mapping(uint256 => Proposal) private proposals;
     mapping(uint256 => mapping(address => bool)) private hasApproved;
@@ -93,6 +96,7 @@ contract MultiVault is
     function createProposal(
         address recipient,
         uint256 amount,
+        address token,
         bytes calldata data
     ) external override returns (uint256) {
         if (!signers[msg.sender].active) revert InvalidSigner();
@@ -103,6 +107,7 @@ contract MultiVault is
             id: proposalId,
             recipient: recipient,
             amount: amount,
+            token: token,
             data: data,
             approvalWeight: 0,
             createdAt: block.timestamp,
@@ -139,8 +144,16 @@ contract MultiVault is
         proposal.executed = true;
 
         if (proposal.amount > 0) {
-            (bool success, ) = proposal.recipient.call{value: proposal.amount}(proposal.data);
-            if (!success) revert TransferFailed();
+            if (proposal.token == address(0)) {
+                (bool success, ) = proposal.recipient.call{value: proposal.amount}(proposal.data);
+                if (!success) revert TransferFailed();
+            } else {
+                IERC20Upgradeable(proposal.token).safeTransfer(proposal.recipient, proposal.amount);
+                if (proposal.data.length > 0) {
+                    (bool success, ) = proposal.recipient.call(proposal.data);
+                    if (!success) revert TransferFailed();
+                }
+            }
         } else if (proposal.data.length > 0) {
             (bool success, ) = proposal.recipient.call(proposal.data);
             if (!success) revert TransferFailed();

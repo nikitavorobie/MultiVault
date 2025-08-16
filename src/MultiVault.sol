@@ -35,6 +35,8 @@ contract MultiVault is
     error InsufficientApprovals();
     error AlreadyApproved();
     error TransferFailed();
+    error InvalidRecipient();
+    error CannotRemoveLastSigner();
 
     function initialize(
         address[] memory _signers,
@@ -62,6 +64,7 @@ contract MultiVault is
 
     function removeSigner(address signer) external override onlyOwner {
         if (!signers[signer].active) revert SignerNotFound();
+        if (signerList.length <= 1) revert CannotRemoveLastSigner();
 
         totalWeight -= signers[signer].weight;
         signers[signer].active = false;
@@ -100,6 +103,7 @@ contract MultiVault is
         bytes calldata data
     ) external override returns (uint256) {
         if (!signers[msg.sender].active) revert InvalidSigner();
+        if (recipient == address(0)) revert InvalidRecipient();
 
         uint256 proposalId = proposalCount++;
 

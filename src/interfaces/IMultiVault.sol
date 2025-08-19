@@ -22,12 +22,12 @@ interface IMultiVault {
 
     event SignerAdded(address indexed signer, uint256 weight);
     event SignerRemoved(address indexed signer);
-    event SignerWeightUpdated(address indexed signer, uint256 newWeight);
-    event ThresholdUpdated(uint256 newThreshold);
-    event ProposalCreated(uint256 indexed proposalId, address indexed recipient, uint256 amount);
-    event ProposalApproved(uint256 indexed proposalId, address indexed approver, uint256 weight);
-    event ProposalExecuted(uint256 indexed proposalId);
-    event ProposalCancelled(uint256 indexed proposalId);
+    event SignerWeightUpdated(address indexed signer, uint256 oldWeight, uint256 newWeight);
+    event ThresholdUpdated(uint256 oldThreshold, uint256 newThreshold);
+    event ProposalCreated(uint256 indexed proposalId, address indexed recipient, uint256 amount, address token);
+    event ProposalApproved(uint256 indexed proposalId, address indexed approver, uint256 weight, uint256 totalWeight);
+    event ProposalExecuted(uint256 indexed proposalId, address indexed recipient, uint256 amount);
+    event ProposalCancelled(uint256 indexed proposalId, address indexed cancelledBy);
 
     function addSigner(address signer, uint256 weight) external;
     function removeSigner(address signer) external;

@@ -84,16 +84,18 @@ contract MultiVault is
         if (!signers[signer].active) revert SignerNotFound();
         if (newWeight == 0) revert InvalidWeight();
 
-        totalWeight = totalWeight - signers[signer].weight + newWeight;
+        uint256 oldWeight = signers[signer].weight;
+        totalWeight = totalWeight - oldWeight + newWeight;
         signers[signer].weight = newWeight;
 
-        emit SignerWeightUpdated(signer, newWeight);
+        emit SignerWeightUpdated(signer, oldWeight, newWeight);
     }
 
     function updateThreshold(uint256 newThreshold) external override onlyOwner {
         if (newThreshold == 0 || newThreshold > totalWeight) revert InvalidThreshold();
+        uint256 oldThreshold = threshold;
         threshold = newThreshold;
-        emit ThresholdUpdated(newThreshold);
+        emit ThresholdUpdated(oldThreshold, newThreshold);
     }
 
     function createProposal(
@@ -119,7 +121,7 @@ contract MultiVault is
             cancelled: false
         });
 
-        emit ProposalCreated(proposalId, recipient, amount);
+        emit ProposalCreated(proposalId, recipient, amount, token);
         return proposalId;
     }
 
@@ -133,9 +135,10 @@ contract MultiVault is
         if (hasApproved[proposalId][msg.sender]) revert AlreadyApproved();
 
         hasApproved[proposalId][msg.sender] = true;
-        proposal.approvalWeight += signers[msg.sender].weight;
+        uint256 signerWeight = signers[msg.sender].weight;
+        proposal.approvalWeight += signerWeight;
 
-        emit ProposalApproved(proposalId, msg.sender, signers[msg.sender].weight);
+        emit ProposalApproved(proposalId, msg.sender, signerWeight, proposal.approvalWeight);
     }
 
     function executeProposal(uint256 proposalId) external override nonReentrant {
@@ -163,7 +166,7 @@ contract MultiVault is
             if (!success) revert TransferFailed();
         }
 
-        emit ProposalExecuted(proposalId);
+        emit ProposalExecuted(proposalId, proposal.recipient, proposal.amount);
     }
 
     function cancelProposal(uint256 proposalId) external override onlyOwner {
@@ -173,7 +176,7 @@ contract MultiVault is
         if (proposal.cancelled) revert ProposalAlreadyCancelled();
 
         proposal.cancelled = true;
-        emit ProposalCancelled(proposalId);
+        emit ProposalCancelled(proposalId, msg.sender);
     }
 
     function getProposal(uint256 proposalId) external view override returns (Proposal memory) {

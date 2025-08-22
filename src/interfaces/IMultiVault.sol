@@ -16,6 +16,7 @@ interface IMultiVault {
         bytes data;
         uint256 approvalWeight;
         uint256 createdAt;
+        uint256 expiresAt;
         bool executed;
         bool cancelled;
     }

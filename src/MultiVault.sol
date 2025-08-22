@@ -23,6 +23,7 @@ contract MultiVault is
     uint256 private proposalCount;
     uint256 private threshold;
     uint256 private totalWeight;
+    uint256 public proposalExpirationPeriod;
 
     error InvalidSigner();
     error SignerAlreadyExists();
@@ -37,6 +38,7 @@ contract MultiVault is
     error TransferFailed();
     error InvalidRecipient();
     error CannotRemoveLastSigner();
+    error ProposalExpired();
 
     function initialize(
         address[] memory _signers,
@@ -56,6 +58,7 @@ contract MultiVault is
 
         if (_threshold > totalWeight) revert InvalidThreshold();
         threshold = _threshold;
+        proposalExpirationPeriod = 30 days;
     }
 
     function addSigner(address signer, uint256 weight) external override onlyOwner {
@@ -117,6 +120,7 @@ contract MultiVault is
             data: data,
             approvalWeight: 0,
             createdAt: block.timestamp,
+            expiresAt: block.timestamp + proposalExpirationPeriod,
             executed: false,
             cancelled: false
         });
@@ -132,6 +136,7 @@ contract MultiVault is
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
         if (proposal.cancelled) revert ProposalAlreadyCancelled();
+        if (block.timestamp > proposal.expiresAt) revert ProposalExpired();
         if (hasApproved[proposalId][msg.sender]) revert AlreadyApproved();
 
         hasApproved[proposalId][msg.sender] = true;
@@ -146,6 +151,7 @@ contract MultiVault is
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
         if (proposal.cancelled) revert ProposalAlreadyCancelled();
+        if (block.timestamp > proposal.expiresAt) revert ProposalExpired();
         if (proposal.approvalWeight < threshold) revert InsufficientApprovals();
 
         proposal.executed = true;

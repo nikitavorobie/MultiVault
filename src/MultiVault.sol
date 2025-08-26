@@ -201,6 +201,22 @@ contract MultiVault is
         return threshold;
     }
 
+    function getProposalCount() external view returns (uint256) {
+        return proposalCount;
+    }
+
+    function getSignerCount() external view returns (uint256) {
+        return signerList.length;
+    }
+
+    function getAllSigners() external view returns (address[] memory) {
+        return signerList;
+    }
+
+    function hasApprovedProposal(uint256 proposalId, address signer) external view returns (bool) {
+        return hasApproved[proposalId][signer];
+    }
+
     function _addSigner(address signer, uint256 weight) private {
         if (signer == address(0)) revert InvalidSigner();
         if (signers[signer].active) revert SignerAlreadyExists();

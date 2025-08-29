@@ -67,14 +67,16 @@ contract MultiVault is
 
     function removeSigner(address signer) external override onlyOwner {
         if (!signers[signer].active) revert SignerNotFound();
-        if (signerList.length <= 1) revert CannotRemoveLastSigner();
+
+        uint256 listLength = signerList.length;
+        if (listLength <= 1) revert CannotRemoveLastSigner();
 
         totalWeight -= signers[signer].weight;
         signers[signer].active = false;
 
-        for (uint256 i = 0; i < signerList.length; i++) {
+        for (uint256 i = 0; i < listLength; i++) {
             if (signerList[i] == signer) {
-                signerList[i] = signerList[signerList.length - 1];
+                signerList[i] = signerList[listLength - 1];
                 signerList.pop();
                 break;
             }
@@ -88,7 +90,9 @@ contract MultiVault is
         if (newWeight == 0) revert InvalidWeight();
 
         uint256 oldWeight = signers[signer].weight;
-        totalWeight = totalWeight - oldWeight + newWeight;
+        unchecked {
+            totalWeight = totalWeight - oldWeight + newWeight;
+        }
         signers[signer].weight = newWeight;
 
         emit SignerWeightUpdated(signer, oldWeight, newWeight);

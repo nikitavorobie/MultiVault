@@ -8,6 +8,9 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeab
 import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "./interfaces/IMultiVault.sol";
 
+/// @title MultiVault - Multi-signature vault with weighted voting
+/// @notice Manages proposals with threshold-based approvals and programmable payouts
+/// @dev Implements UUPS upgradeable pattern with role-based access control
 contract MultiVault is
     IMultiVault,
     UUPSUpgradeable,
@@ -105,6 +108,12 @@ contract MultiVault is
         emit ThresholdUpdated(oldThreshold, newThreshold);
     }
 
+    /// @notice Creates a new proposal for fund transfer or contract call
+    /// @param recipient The address to receive funds or execute call
+    /// @param amount The amount of tokens/ETH to transfer
+    /// @param token The token address (address(0) for native ETH)
+    /// @param data Additional calldata for contract interaction
+    /// @return proposalId The unique identifier for the created proposal
     function createProposal(
         address recipient,
         uint256 amount,
@@ -133,6 +142,8 @@ contract MultiVault is
         return proposalId;
     }
 
+    /// @notice Approves a proposal with the caller's voting weight
+    /// @param proposalId The ID of the proposal to approve
     function approveProposal(uint256 proposalId) external override {
         if (!signers[msg.sender].active) revert InvalidSigner();
 
@@ -150,6 +161,8 @@ contract MultiVault is
         emit ProposalApproved(proposalId, msg.sender, signerWeight, proposal.approvalWeight);
     }
 
+    /// @notice Executes an approved proposal if threshold is met
+    /// @param proposalId The ID of the proposal to execute
     function executeProposal(uint256 proposalId) external override nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();

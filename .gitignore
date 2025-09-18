@@ -10,3 +10,6 @@ lcov.info
 *.swo
 .DS_Store
 lib/
+*.log
+coverage/
+artifacts/

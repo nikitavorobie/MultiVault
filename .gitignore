@@ -13,3 +13,4 @@ lib/
 *.log
 coverage/
 artifacts/
+node_modules/

@@ -21,3 +21,4 @@ basenames/
 *.tgz
 dist/
 *.backup
+*.tmp

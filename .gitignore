@@ -22,3 +22,4 @@ basenames/
 dist/
 *.backup
 *.tmp
+package-lock.json

@@ -36,3 +36,4 @@ debug.log
 error.log
 test-results/
 *.sol.bak
+.env.production

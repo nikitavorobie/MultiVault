@@ -32,3 +32,4 @@ deployments/
 *.orig
 .cache/
 build/
+debug.log

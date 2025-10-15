@@ -31,3 +31,4 @@ deployments/
 *.bak
 *.orig
 .cache/
+build/

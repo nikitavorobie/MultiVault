@@ -34,3 +34,4 @@ deployments/
 build/
 debug.log
 error.log
+test-results/

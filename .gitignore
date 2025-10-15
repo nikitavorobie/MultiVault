@@ -28,3 +28,4 @@ pnpm-lock.yaml
 typechain/
 deployments/
 *.env.local
+*.bak

@@ -27,3 +27,4 @@ yarn.lock
 pnpm-lock.yaml
 typechain/
 deployments/
+*.env.local

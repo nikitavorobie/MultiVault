@@ -33,3 +33,4 @@ deployments/
 .cache/
 build/
 debug.log
+error.log

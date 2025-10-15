@@ -30,3 +30,4 @@ deployments/
 *.env.local
 *.bak
 *.orig
+.cache/

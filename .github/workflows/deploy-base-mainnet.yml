@@ -29,6 +29,11 @@ jobs:
         with:
           version: nightly
 
+      - name: Install dependencies
+        run: |
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
+
       - name: Deploy contracts
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
@@ -42,7 +47,7 @@ jobs:
             -vvvv
 
       - name: Save deployment artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mainnet-deployment
           path: broadcast/

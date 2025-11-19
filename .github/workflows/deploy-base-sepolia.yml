@@ -24,12 +24,6 @@ jobs:
           forge install foundry-rs/forge-std --no-git
           git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git lib/openzeppelin-contracts-upgradeable
           git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts
-          echo "=== Searching for IERC20Upgradeable.sol ==="
-          find lib/openzeppelin-contracts-upgradeable -name "IERC20Upgradeable.sol" || echo "IERC20Upgradeable.sol not found"
-          echo "=== Searching for SafeERC20Upgradeable.sol ==="
-          find lib/openzeppelin-contracts-upgradeable -name "SafeERC20Upgradeable.sol" || echo "SafeERC20Upgradeable.sol not found"
-          echo "=== Checking interfaces directory ==="
-          ls -la lib/openzeppelin-contracts-upgradeable/contracts/interfaces/ || echo "interfaces dir not found"
 
       - name: Deploy contracts
         env:

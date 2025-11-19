@@ -3,11 +3,11 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     enum PayoutType {
         OneTime,
@@ -167,7 +167,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
             (bool success, ) = payout.recipient.call{value: claimable}("");
             require(success, "Transfer failed");
         } else {
-            IERC20Upgradeable(payout.token).safeTransfer(payout.recipient, claimable);
+            IERC20(payout.token).safeTransfer(payout.recipient, claimable);
         }
 
         emit PayoutClaimed(payoutId, claimable);

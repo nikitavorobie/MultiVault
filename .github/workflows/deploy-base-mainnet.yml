@@ -32,8 +32,8 @@ jobs:
       - name: Install dependencies
         run: |
           forge install foundry-rs/forge-std --no-git
-          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2 --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.0.2
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2
           cd lib/openzeppelin-contracts-upgradeable && git submodule update --init --recursive && cd ../..
           cd lib/openzeppelin-contracts && git submodule update --init --recursive && cd ../..
 

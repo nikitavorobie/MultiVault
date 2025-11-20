@@ -47,7 +47,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
     error InvalidAmount();
     error InvalidTimeRange();
     error PayoutNotFound();
-    error PayoutCancelled();
+    error PayoutAlreadyCancelled();
     error NothingToClaim();
     error CliffNotReached();
 
@@ -155,7 +155,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
     function claim(uint256 payoutId) external {
         Payout storage payout = payouts[payoutId];
         if (payout.startTime == 0) revert PayoutNotFound();
-        if (payout.cancelled) revert PayoutCancelled();
+        if (payout.cancelled) revert PayoutAlreadyCancelled();
         if (msg.sender != payout.recipient) revert Unauthorized();
 
         uint256 claimable = getClaimableAmount(payoutId);
@@ -176,7 +176,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
     function cancelPayout(uint256 payoutId) external onlyMultiVault {
         Payout storage payout = payouts[payoutId];
         if (payout.startTime == 0) revert PayoutNotFound();
-        if (payout.cancelled) revert PayoutCancelled();
+        if (payout.cancelled) revert PayoutAlreadyCancelled();
 
         payout.cancelled = true;
         emit PayoutCancelled(payoutId);

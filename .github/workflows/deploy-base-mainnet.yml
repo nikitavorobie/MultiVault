@@ -29,6 +29,12 @@ jobs:
         with:
           version: nightly
 
+      - name: Install dependencies
+        run: |
+          forge install foundry-rs/forge-std --no-git
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git lib/openzeppelin-contracts-upgradeable
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts
+
       - name: Deploy contracts
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
@@ -42,7 +48,7 @@ jobs:
             -vvvv
 
       - name: Save deployment artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: mainnet-deployment
           path: broadcast/

@@ -3,12 +3,12 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IBasePay.sol";
 
 contract BasePayIntegration is UUPSUpgradeable, OwnableUpgradeable {
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     address public constant USDC_BASE = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
     address public basePay;
@@ -41,11 +41,11 @@ contract BasePayIntegration is UUPSUpgradeable, OwnableUpgradeable {
         if (amount == 0) revert InvalidAmount();
 
         if (basePay != address(0)) {
-            IERC20Upgradeable(USDC_BASE).approve(basePay, amount);
+            IERC20(USDC_BASE).approve(basePay, amount);
             bool success = IBasePay(basePay).transfer(USDC_BASE, recipient, amount);
             if (!success) revert TransferFailed();
         } else {
-            IERC20Upgradeable(USDC_BASE).safeTransfer(recipient, amount);
+            IERC20(USDC_BASE).safeTransfer(recipient, amount);
         }
 
         emit USDCTransferExecuted(recipient, amount);
@@ -67,12 +67,12 @@ contract BasePayIntegration is UUPSUpgradeable, OwnableUpgradeable {
         }
 
         if (basePay != address(0)) {
-            IERC20Upgradeable(USDC_BASE).approve(basePay, totalAmount);
+            IERC20(USDC_BASE).approve(basePay, totalAmount);
             bool success = IBasePay(basePay).batchTransfer(USDC_BASE, recipients, amounts);
             if (!success) revert TransferFailed();
         } else {
             for (uint256 i = 0; i < recipients.length; i++) {
-                IERC20Upgradeable(USDC_BASE).safeTransfer(recipients[i], amounts[i]);
+                IERC20(USDC_BASE).safeTransfer(recipients[i], amounts[i]);
             }
         }
 
@@ -86,11 +86,11 @@ contract BasePayIntegration is UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function withdrawUSDC(address recipient, uint256 amount) external onlyOwner {
-        IERC20Upgradeable(USDC_BASE).safeTransfer(recipient, amount);
+        IERC20(USDC_BASE).safeTransfer(recipient, amount);
     }
 
     function getUSDCBalance() external view returns (uint256) {
-        return IERC20Upgradeable(USDC_BASE).balanceOf(address(this));
+        return IERC20(USDC_BASE).balanceOf(address(this));
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}

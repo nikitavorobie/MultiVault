@@ -18,6 +18,12 @@ jobs:
         with:
           version: nightly
 
+      - name: Install dependencies
+        run: |
+          forge install foundry-rs/forge-std --no-git
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git lib/openzeppelin-contracts-upgradeable
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts
+
       - name: Run coverage
         run: forge coverage --report summary --report lcov
 

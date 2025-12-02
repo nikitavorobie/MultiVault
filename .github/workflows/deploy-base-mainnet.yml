@@ -45,21 +45,53 @@ jobs:
             --rpc-url $BASE_MAINNET_RPC_URL \
             --broadcast \
             --verify \
-            -vvvv
+            -vvvv 2>&1 | tee deploy.log
+
+      - name: Extract deployment addresses
+        id: extract
+        run: |
+          VAULT_PROXY=$(grep "MultiVault proxy deployed at:" deploy.log | awk '{print $NF}')
+          VAULT_IMPL=$(grep "MultiVault implementation deployed at:" deploy.log | awk '{print $NF}')
+          PAYOUT_PROXY=$(grep "PayoutExecutor proxy deployed at:" deploy.log | awk '{print $NF}')
+          PAYOUT_IMPL=$(grep "PayoutExecutor implementation deployed at:" deploy.log | awk '{print $NF}')
+
+          echo "vault_proxy=$VAULT_PROXY" >> $GITHUB_OUTPUT
+          echo "vault_impl=$VAULT_IMPL" >> $GITHUB_OUTPUT
+          echo "payout_proxy=$PAYOUT_PROXY" >> $GITHUB_OUTPUT
+          echo "payout_impl=$PAYOUT_IMPL" >> $GITHUB_OUTPUT
+
+      - name: Update deployment file
+        run: |
+          cat > deployments/base-mainnet.json << EOF
+          {
+            "network": "base-mainnet",
+            "chainId": 8453,
+            "rpcUrl": "https://mainnet.base.org",
+            "explorer": "https://basescan.org",
+            "deployedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+            "contracts": {
+              "MultiVault": {
+                "proxy": "${{ steps.extract.outputs.vault_proxy }}",
+                "implementation": "${{ steps.extract.outputs.vault_impl }}",
+                "verified": true
+              },
+              "PayoutExecutor": {
+                "proxy": "${{ steps.extract.outputs.payout_proxy }}",
+                "implementation": "${{ steps.extract.outputs.payout_impl }}",
+                "verified": true
+              }
+            }
+          }
+          EOF
+
+      - name: Commit deployment addresses
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update Base Mainnet deployment addresses"
+          file_pattern: deployments/base-mainnet.json
 
       - name: Save deployment artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mainnet-deployment
           path: broadcast/
-
-      - name: Create deployment record
-        run: |
-          echo "Deployment completed at $(date)" >> deployment-log.txt
-          echo "Network: Base Mainnet" >> deployment-log.txt
-
-      - name: Commit deployment log
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore: update mainnet deployment log"
-          file_pattern: deployment-log.txt

@@ -1,0 +1,25 @@
+{
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "rpcUrl": "https://sepolia.base.org",
+  "explorer": "https://sepolia.basescan.org",
+  "contracts": {
+    "MultiVault": {
+      "proxy": "0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439",
+      "implementation": "0xD06B5813305db8d6DAD601E6bAf1699Ac93EFD9E",
+      "deployer": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635",
+      "deployedAt": "2024-11-20T00:00:00Z",
+      "gasUsed": 2750711,
+      "verified": true
+    },
+    "PayoutExecutor": {
+      "proxy": "0x5828179353Ad884B10f40Be9122747e1415d7Ea1",
+      "implementation": "0x5762F53B44192AA4eF0999a5240898e4d059dDb1",
+      "deployer": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635",
+      "deployedAt": "2024-11-20T00:00:00Z",
+      "gasUsed": 2750711,
+      "verified": true
+    }
+  },
+  "upgrades": []
+}

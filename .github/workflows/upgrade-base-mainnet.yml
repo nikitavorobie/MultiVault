@@ -1,0 +1,71 @@
+name: Upgrade Base Mainnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "UPGRADE" to confirm mainnet upgrade'
+        required: true
+      proxy_address:
+        description: 'Proxy address to upgrade'
+        required: true
+        default: '0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439'
+
+jobs:
+  upgrade:
+    name: Upgrade Contract on Mainnet
+    runs-on: ubuntu-latest
+    environment: base-mainnet
+
+    steps:
+      - name: Validate confirmation
+        if: github.event.inputs.confirm != 'UPGRADE'
+        run: |
+          echo "Upgrade cancelled. Confirmation required."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install dependencies
+        run: |
+          forge install foundry-rs/forge-std --no-git
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable.git lib/openzeppelin-contracts-upgradeable
+          git clone --branch v5.0.2 --recurse-submodules https://github.com/OpenZeppelin/openzeppelin-contracts.git lib/openzeppelin-contracts
+
+      - name: Upgrade contract
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
+          BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
+          PROXY_ADDRESS: ${{ github.event.inputs.proxy_address }}
+        run: |
+          forge script script/Upgrade.s.sol:UpgradeScript \
+            --rpc-url $BASE_MAINNET_RPC_URL \
+            --broadcast \
+            --verify \
+            -vvvv
+
+      - name: Save upgrade artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mainnet-upgrade
+          path: broadcast/
+
+      - name: Create upgrade record
+        run: |
+          echo "Upgrade completed at $(date)" >> upgrade-log.txt
+          echo "Network: Base Mainnet" >> upgrade-log.txt
+          echo "Proxy: ${{ github.event.inputs.proxy_address }}" >> upgrade-log.txt
+
+      - name: Commit upgrade log
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: record mainnet upgrade"
+          file_pattern: upgrade-log.txt

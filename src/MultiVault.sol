@@ -18,6 +18,7 @@ contract MultiVault is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
+
     mapping(address => Signer) private signers;
     mapping(uint256 => Proposal) private proposals;
     mapping(uint256 => mapping(address => bool)) private hasApproved;
@@ -27,6 +28,13 @@ contract MultiVault is
     uint256 private threshold;
     uint256 private totalWeight;
     uint256 public proposalExpirationPeriod;
+
+    mapping(uint256 => VaultInfo) private vaults;
+    mapping(uint256 => mapping(address => Signer)) private vaultSigners;
+    mapping(uint256 => address[]) private vaultSignerList;
+    uint256 private vaultCount;
+
+    uint256[46] private __gap;
 
     error InvalidSigner();
     error SignerAlreadyExists();
@@ -42,6 +50,8 @@ contract MultiVault is
     error InvalidRecipient();
     error CannotRemoveLastSigner();
     error ProposalExpired();
+    error VaultNotFound();
+    error InvalidVaultName();
 
     function initialize(
         address[] memory _signers,
@@ -62,6 +72,84 @@ contract MultiVault is
         if (_threshold > totalWeight) revert InvalidThreshold();
         threshold = _threshold;
         proposalExpirationPeriod = 30 days;
+    }
+
+    function createVault(string calldata name, string calldata metadataRef) external override onlyOwner returns (uint256) {
+        if (bytes(name).length == 0) revert InvalidVaultName();
+
+        uint256 vaultId = vaultCount++;
+
+        vaults[vaultId] = VaultInfo({
+            id: vaultId,
+            name: name,
+            metadataRef: metadataRef,
+            threshold: 0,
+            totalWeight: 0,
+            signerCount: 0,
+            active: true
+        });
+
+        emit VaultCreated(vaultId, name, metadataRef);
+        return vaultId;
+    }
+
+    function addSigner(uint256 vaultId, address signer, uint256 weight) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (signer == address(0)) revert InvalidSigner();
+        if (vaultSigners[vaultId][signer].active) revert SignerAlreadyExists();
+        if (weight == 0) revert InvalidWeight();
+
+        vaultSigners[vaultId][signer] = Signer({
+            addr: signer,
+            weight: weight,
+            active: true
+        });
+
+        vaultSignerList[vaultId].push(signer);
+        vaults[vaultId].totalWeight += weight;
+        vaults[vaultId].signerCount++;
+
+        emit VaultSignerAdded(vaultId, signer, weight);
+    }
+
+    function removeSigner(uint256 vaultId, address signer) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
+
+        uint256 listLength = vaultSignerList[vaultId].length;
+        if (listLength <= 1) revert CannotRemoveLastSigner();
+
+        vaults[vaultId].totalWeight -= vaultSigners[vaultId][signer].weight;
+        vaults[vaultId].signerCount--;
+        vaultSigners[vaultId][signer].active = false;
+
+        for (uint256 i = 0; i < listLength; i++) {
+            if (vaultSignerList[vaultId][i] == signer) {
+                vaultSignerList[vaultId][i] = vaultSignerList[vaultId][listLength - 1];
+                vaultSignerList[vaultId].pop();
+                break;
+            }
+        }
+
+        emit VaultSignerRemoved(vaultId, signer);
+    }
+
+    function setThreshold(uint256 vaultId, uint256 newThreshold) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (newThreshold == 0 || newThreshold > vaults[vaultId].totalWeight) revert InvalidThreshold();
+
+        uint256 oldThreshold = vaults[vaultId].threshold;
+        vaults[vaultId].threshold = newThreshold;
+
+        emit VaultThresholdUpdated(vaultId, oldThreshold, newThreshold);
+    }
+
+    function getVaultInfo(uint256 vaultId) external view override returns (VaultInfo memory) {
+        return vaults[vaultId];
+    }
+
+    function getSignerInfo(uint256 vaultId, address signer) external view override returns (Signer memory) {
+        return vaultSigners[vaultId][signer];
     }
 
     function addSigner(address signer, uint256 weight) external override onlyOwner {

@@ -16,17 +16,8 @@ contract DeployScript is Script {
         MultiVault vaultImpl = new MultiVault();
         console.log("MultiVault implementation deployed at:", address(vaultImpl));
 
-        address[] memory signers = new address[](1);
-        signers[0] = deployer;
-
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = 100;
-
         bytes memory initData = abi.encodeWithSelector(
-            MultiVault.initialize.selector,
-            signers,
-            weights,
-            100
+            MultiVault.initialize.selector
         );
 
         ERC1967Proxy vaultProxy = new ERC1967Proxy(

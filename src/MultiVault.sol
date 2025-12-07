@@ -3,14 +3,11 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IMultiVault.sol";
 
-/// @title MultiVault - Multi-signature vault with weighted voting
-/// @notice Manages proposals with threshold-based approvals and programmable payouts
-/// @dev Implements UUPS upgradeable pattern with role-based access control
 contract MultiVault is
     IMultiVault,
     UUPSUpgradeable,
@@ -18,15 +15,29 @@ contract MultiVault is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
-    mapping(address => Signer) private signers;
-    mapping(uint256 => Proposal) private proposals;
-    mapping(uint256 => mapping(address => bool)) private hasApproved;
 
-    address[] private signerList;
-    uint256 private proposalCount;
-    uint256 private threshold;
-    uint256 private totalWeight;
-    uint256 public proposalExpirationPeriod;
+    // ============================================
+    // Storage Layout (UUPS Upgradeability)
+    // ============================================
+    // Slots 0-99: OpenZeppelin Upgradeable (Ownable, ReentrancyGuard, UUPS)
+    // Slots 100-149: Controller-level data
+    // Slots 150-199: Reserved for future expansion (__gap)
+
+    // Controller-level: Global proposal tracking across all vaults
+    mapping(uint256 => Proposal) private proposals;              // slot 0
+    mapping(uint256 => mapping(address => bool)) private hasApproved; // slot 1
+    uint256 private proposalCount;                               // slot 2
+    uint256 public proposalExpirationPeriod;                     // slot 3
+
+    // Controller-level: Vault registry and factory
+    mapping(uint256 => VaultInfo) private vaults;                // slot 4
+    mapping(uint256 => mapping(address => Signer)) private vaultSigners; // slot 5
+    mapping(uint256 => address[]) private vaultSignerList;       // slot 6
+    uint256 private vaultCount;                                  // slot 7
+
+    // Reserved for future controller-level features
+    // Example: cross-vault policies, global limits, fee collection
+    uint256[50] private __gap;
 
     error InvalidSigner();
     error SignerAlreadyExists();
@@ -42,91 +53,131 @@ contract MultiVault is
     error InvalidRecipient();
     error CannotRemoveLastSigner();
     error ProposalExpired();
+    error VaultNotFound();
+    error InvalidVaultName();
+    error VaultAlreadyArchived();
+    error CannotArchiveVaultWithActiveProposals();
 
-    function initialize(
-        address[] memory _signers,
-        uint256[] memory _weights,
-        uint256 _threshold
-    ) public initializer {
-        __Ownable_init(msg.sender);
+    function initialize() public initializer {
+        __Ownable_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-
-        if (_signers.length != _weights.length) revert InvalidSigner();
-        if (_threshold == 0) revert InvalidThreshold();
-
-        for (uint256 i = 0; i < _signers.length; i++) {
-            _addSigner(_signers[i], _weights[i]);
-        }
-
-        if (_threshold > totalWeight) revert InvalidThreshold();
-        threshold = _threshold;
         proposalExpirationPeriod = 30 days;
     }
 
-    function addSigner(address signer, uint256 weight) external override onlyOwner {
-        _addSigner(signer, weight);
+    function createVault(string calldata name, string calldata metadataRef) external override onlyOwner returns (uint256) {
+        if (bytes(name).length == 0) revert InvalidVaultName();
+
+        uint256 vaultId = vaultCount++;
+
+        vaults[vaultId] = VaultInfo({
+            id: vaultId,
+            name: name,
+            metadataRef: metadataRef,
+            threshold: 0,
+            totalWeight: 0,
+            signerCount: 0,
+            active: true
+        });
+
+        emit VaultCreated(vaultId, name, metadataRef);
+        return vaultId;
     }
 
-    function removeSigner(address signer) external override onlyOwner {
-        if (!signers[signer].active) revert SignerNotFound();
+    function addSigner(uint256 vaultId, address signer, uint256 weight) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (signer == address(0)) revert InvalidSigner();
+        if (vaultSigners[vaultId][signer].active) revert SignerAlreadyExists();
+        if (weight == 0) revert InvalidWeight();
 
-        uint256 listLength = signerList.length;
+        vaultSigners[vaultId][signer] = Signer({
+            addr: signer,
+            weight: weight,
+            active: true
+        });
+
+        vaultSignerList[vaultId].push(signer);
+        vaults[vaultId].totalWeight += weight;
+        vaults[vaultId].signerCount++;
+
+        emit VaultSignerAdded(vaultId, signer, weight);
+    }
+
+    function removeSigner(uint256 vaultId, address signer) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
+
+        uint256 listLength = vaultSignerList[vaultId].length;
         if (listLength <= 1) revert CannotRemoveLastSigner();
 
-        totalWeight -= signers[signer].weight;
-        signers[signer].active = false;
+        vaults[vaultId].totalWeight -= vaultSigners[vaultId][signer].weight;
+        vaults[vaultId].signerCount--;
+        vaultSigners[vaultId][signer].active = false;
 
         for (uint256 i = 0; i < listLength; i++) {
-            if (signerList[i] == signer) {
-                signerList[i] = signerList[listLength - 1];
-                signerList.pop();
+            if (vaultSignerList[vaultId][i] == signer) {
+                vaultSignerList[vaultId][i] = vaultSignerList[vaultId][listLength - 1];
+                vaultSignerList[vaultId].pop();
                 break;
             }
         }
 
-        emit SignerRemoved(signer);
+        emit VaultSignerRemoved(vaultId, signer);
     }
 
-    function updateSignerWeight(address signer, uint256 newWeight) external override onlyOwner {
-        if (!signers[signer].active) revert SignerNotFound();
+    function setThreshold(uint256 vaultId, uint256 newThreshold) external override onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (newThreshold == 0 || newThreshold > vaults[vaultId].totalWeight) revert InvalidThreshold();
+
+        uint256 oldThreshold = vaults[vaultId].threshold;
+        vaults[vaultId].threshold = newThreshold;
+
+        emit VaultThresholdUpdated(vaultId, oldThreshold, newThreshold);
+    }
+
+    function updateSignerWeight(uint256 vaultId, address signer, uint256 newWeight) external onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
         if (newWeight == 0) revert InvalidWeight();
 
-        uint256 oldWeight = signers[signer].weight;
-        unchecked {
-            totalWeight = totalWeight - oldWeight + newWeight;
-        }
-        signers[signer].weight = newWeight;
+        uint256 oldWeight = vaultSigners[vaultId][signer].weight;
+        vaults[vaultId].totalWeight = vaults[vaultId].totalWeight - oldWeight + newWeight;
+        vaultSigners[vaultId][signer].weight = newWeight;
 
-        emit SignerWeightUpdated(signer, oldWeight, newWeight);
+        emit VaultSignerWeightUpdated(vaultId, signer, oldWeight, newWeight);
     }
 
-    function updateThreshold(uint256 newThreshold) external override onlyOwner {
-        if (newThreshold == 0 || newThreshold > totalWeight) revert InvalidThreshold();
-        uint256 oldThreshold = threshold;
-        threshold = newThreshold;
-        emit ThresholdUpdated(oldThreshold, newThreshold);
+    function archiveVault(uint256 vaultId) external onlyOwner {
+        if (!vaults[vaultId].active) revert VaultAlreadyArchived();
+
+        vaults[vaultId].active = false;
+        emit VaultArchived(vaultId);
     }
 
-    /// @notice Creates a new proposal for fund transfer or contract call
-    /// @param recipient The address to receive funds or execute call
-    /// @param amount The amount of tokens/ETH to transfer
-    /// @param token The token address (address(0) for native ETH)
-    /// @param data Additional calldata for contract interaction
-    /// @return proposalId The unique identifier for the created proposal
+    function getVaultInfo(uint256 vaultId) external view override returns (VaultInfo memory) {
+        return vaults[vaultId];
+    }
+
+    function getSignerInfo(uint256 vaultId, address signer) external view override returns (Signer memory) {
+        return vaultSigners[vaultId][signer];
+    }
+
     function createProposal(
+        uint256 vaultId,
         address recipient,
         uint256 amount,
         address token,
         bytes calldata data
     ) external override returns (uint256) {
-        if (!signers[msg.sender].active) revert InvalidSigner();
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (!vaultSigners[vaultId][msg.sender].active) revert InvalidSigner();
         if (recipient == address(0)) revert InvalidRecipient();
 
         uint256 proposalId = proposalCount++;
 
         proposals[proposalId] = Proposal({
             id: proposalId,
+            vaultId: vaultId,
             recipient: recipient,
             amount: amount,
             token: token,
@@ -138,15 +189,11 @@ contract MultiVault is
             cancelled: false
         });
 
-        emit ProposalCreated(proposalId, recipient, amount, token);
+        emit ProposalCreated(proposalId, vaultId, recipient, amount);
         return proposalId;
     }
 
-    /// @notice Approves a proposal with the caller's voting weight
-    /// @param proposalId The ID of the proposal to approve
     function approveProposal(uint256 proposalId) external override {
-        if (!signers[msg.sender].active) revert InvalidSigner();
-
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
@@ -154,22 +201,25 @@ contract MultiVault is
         if (block.timestamp > proposal.expiresAt) revert ProposalExpired();
         if (hasApproved[proposalId][msg.sender]) revert AlreadyApproved();
 
+        uint256 vaultId = proposal.vaultId;
+        if (!vaultSigners[vaultId][msg.sender].active) revert InvalidSigner();
+
         hasApproved[proposalId][msg.sender] = true;
-        uint256 signerWeight = signers[msg.sender].weight;
+        uint256 signerWeight = vaultSigners[vaultId][msg.sender].weight;
         proposal.approvalWeight += signerWeight;
 
         emit ProposalApproved(proposalId, msg.sender, signerWeight, proposal.approvalWeight);
     }
 
-    /// @notice Executes an approved proposal if threshold is met
-    /// @param proposalId The ID of the proposal to execute
     function executeProposal(uint256 proposalId) external override nonReentrant {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
         if (proposal.cancelled) revert ProposalAlreadyCancelled();
         if (block.timestamp > proposal.expiresAt) revert ProposalExpired();
-        if (proposal.approvalWeight < threshold) revert InsufficientApprovals();
+
+        uint256 vaultId = proposal.vaultId;
+        if (proposal.approvalWeight < vaults[vaultId].threshold) revert InsufficientApprovals();
 
         proposal.executed = true;
 
@@ -206,49 +256,16 @@ contract MultiVault is
         return proposals[proposalId];
     }
 
-    function getSigner(address signer) external view override returns (Signer memory) {
-        return signers[signer];
-    }
-
-    function getTotalWeight() external view override returns (uint256) {
-        return totalWeight;
-    }
-
-    function getThreshold() external view override returns (uint256) {
-        return threshold;
-    }
-
     function getProposalCount() external view returns (uint256) {
         return proposalCount;
     }
 
-    function getSignerCount() external view returns (uint256) {
-        return signerList.length;
-    }
-
-    function getAllSigners() external view returns (address[] memory) {
-        return signerList;
+    function getVaultCount() external view returns (uint256) {
+        return vaultCount;
     }
 
     function hasApprovedProposal(uint256 proposalId, address signer) external view returns (bool) {
         return hasApproved[proposalId][signer];
-    }
-
-    function _addSigner(address signer, uint256 weight) private {
-        if (signer == address(0)) revert InvalidSigner();
-        if (signers[signer].active) revert SignerAlreadyExists();
-        if (weight == 0) revert InvalidWeight();
-
-        signers[signer] = Signer({
-            addr: signer,
-            weight: weight,
-            active: true
-        });
-
-        signerList.push(signer);
-        totalWeight += weight;
-
-        emit SignerAdded(signer, weight);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}

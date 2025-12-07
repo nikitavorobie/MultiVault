@@ -6,6 +6,10 @@ Multi-signature treasury protocol for DAOs on Base. Manage multiple independent 
 
 MultiVault enables DAOs and teams to create isolated treasury vaults with customizable governance. Each vault maintains its own signers, voting weights, and approval thresholds.
 
+## Documentation
+
+- **[Vault Model Specification](docs/VAULT_MODEL.md)** - Comprehensive technical documentation covering vault lifecycle, data model, configuration rules, and integration guidelines for developers and auditors
+
 ## Key Features
 
 - **Multiple Vaults**: Create unlimited independent treasuries

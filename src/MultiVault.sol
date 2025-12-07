@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IMultiVault.sol";
@@ -16,16 +16,27 @@ contract MultiVault is
 {
     using SafeERC20 for IERC20;
 
-    mapping(uint256 => Proposal) private proposals;
-    mapping(uint256 => mapping(address => bool)) private hasApproved;
-    uint256 private proposalCount;
-    uint256 public proposalExpirationPeriod;
+    // ============================================
+    // Storage Layout (UUPS Upgradeability)
+    // ============================================
+    // Slots 0-99: OpenZeppelin Upgradeable (Ownable, ReentrancyGuard, UUPS)
+    // Slots 100-149: Controller-level data
+    // Slots 150-199: Reserved for future expansion (__gap)
 
-    mapping(uint256 => VaultInfo) private vaults;
-    mapping(uint256 => mapping(address => Signer)) private vaultSigners;
-    mapping(uint256 => address[]) private vaultSignerList;
-    uint256 private vaultCount;
+    // Controller-level: Global proposal tracking across all vaults
+    mapping(uint256 => Proposal) private proposals;              // slot 0
+    mapping(uint256 => mapping(address => bool)) private hasApproved; // slot 1
+    uint256 private proposalCount;                               // slot 2
+    uint256 public proposalExpirationPeriod;                     // slot 3
 
+    // Controller-level: Vault registry and factory
+    mapping(uint256 => VaultInfo) private vaults;                // slot 4
+    mapping(uint256 => mapping(address => Signer)) private vaultSigners; // slot 5
+    mapping(uint256 => address[]) private vaultSignerList;       // slot 6
+    uint256 private vaultCount;                                  // slot 7
+
+    // Reserved for future controller-level features
+    // Example: cross-vault policies, global limits, fee collection
     uint256[50] private __gap;
 
     error InvalidSigner();
@@ -44,9 +55,11 @@ contract MultiVault is
     error ProposalExpired();
     error VaultNotFound();
     error InvalidVaultName();
+    error VaultAlreadyArchived();
+    error CannotArchiveVaultWithActiveProposals();
 
     function initialize() public initializer {
-        __Ownable_init(msg.sender);
+        __Ownable_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         proposalExpirationPeriod = 30 days;
@@ -120,6 +133,25 @@ contract MultiVault is
         vaults[vaultId].threshold = newThreshold;
 
         emit VaultThresholdUpdated(vaultId, oldThreshold, newThreshold);
+    }
+
+    function updateSignerWeight(uint256 vaultId, address signer, uint256 newWeight) external onlyOwner {
+        if (!vaults[vaultId].active) revert VaultNotFound();
+        if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
+        if (newWeight == 0) revert InvalidWeight();
+
+        uint256 oldWeight = vaultSigners[vaultId][signer].weight;
+        vaults[vaultId].totalWeight = vaults[vaultId].totalWeight - oldWeight + newWeight;
+        vaultSigners[vaultId][signer].weight = newWeight;
+
+        emit VaultSignerWeightUpdated(vaultId, signer, oldWeight, newWeight);
+    }
+
+    function archiveVault(uint256 vaultId) external onlyOwner {
+        if (!vaults[vaultId].active) revert VaultAlreadyArchived();
+
+        vaults[vaultId].active = false;
+        emit VaultArchived(vaultId);
     }
 
     function getVaultInfo(uint256 vaultId) external view override returns (VaultInfo memory) {

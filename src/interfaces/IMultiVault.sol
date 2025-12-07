@@ -35,7 +35,9 @@ interface IMultiVault {
     event VaultCreated(uint256 indexed vaultId, string name, string metadataRef);
     event VaultSignerAdded(uint256 indexed vaultId, address indexed signer, uint256 weight);
     event VaultSignerRemoved(uint256 indexed vaultId, address indexed signer);
+    event VaultSignerWeightUpdated(uint256 indexed vaultId, address indexed signer, uint256 oldWeight, uint256 newWeight);
     event VaultThresholdUpdated(uint256 indexed vaultId, uint256 oldThreshold, uint256 newThreshold);
+    event VaultArchived(uint256 indexed vaultId);
     event ProposalCreated(uint256 indexed proposalId, uint256 indexed vaultId, address indexed recipient, uint256 amount);
     event ProposalApproved(uint256 indexed proposalId, address indexed approver, uint256 weight, uint256 totalWeight);
     event ProposalExecuted(uint256 indexed proposalId, address indexed recipient, uint256 amount);

@@ -57,7 +57,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function initialize(address _multiVault) public initializer {
-        __Ownable_init(msg.sender);
+        __Ownable_init();
         __UUPSUpgradeable_init();
         multiVault = _multiVault;
     }

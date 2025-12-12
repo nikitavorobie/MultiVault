@@ -32,6 +32,16 @@ jobs:
           echo "📍 MultiVault Proxy: $MULTIVAULT_PROXY"
           echo "📍 PayoutExecutor Proxy: $EXECUTOR_PROXY"
 
+      - name: Check current contract state
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL }}
+          PROXY_ADDRESS: ${{ steps.addresses.outputs.multivault_proxy }}
+        run: |
+          forge script script/CheckCurrentState.s.sol:CheckCurrentStateScript \
+            --rpc-url $BASE_SEPOLIA_RPC_URL \
+            -vv
+
       - name: Upgrade contract
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}

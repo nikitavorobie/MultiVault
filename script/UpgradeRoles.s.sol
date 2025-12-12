@@ -24,16 +24,19 @@ contract UpgradeRolesScript is Script {
         PayoutExecutor newExecutorImpl = new PayoutExecutor();
         console.log("New PayoutExecutor implementation:", address(newExecutorImpl));
 
+        // Prepare initializeV2 call to grant DEFAULT_ADMIN_ROLE to deployer
+        bytes memory initData = abi.encodeWithSignature("initializeV2()");
+
         // Upgrade MultiVault proxy
         console.log("Upgrading MultiVault proxy...");
         MultiVault vaultProxy = MultiVault(payable(proxyAddress));
-        vaultProxy.upgradeToAndCall(address(newVaultImpl), "");
+        vaultProxy.upgradeToAndCall(address(newVaultImpl), initData);
         console.log("MultiVault proxy upgraded");
 
         // Upgrade PayoutExecutor proxy
         console.log("Upgrading PayoutExecutor proxy...");
         PayoutExecutor executorProxy = PayoutExecutor(payable(executorProxyAddress));
-        executorProxy.upgradeToAndCall(address(newExecutorImpl), "");
+        executorProxy.upgradeToAndCall(address(newExecutorImpl), initData);
         console.log("PayoutExecutor proxy upgraded");
 
         vm.stopBroadcast();

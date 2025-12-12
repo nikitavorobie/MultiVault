@@ -12,15 +12,21 @@ contract UpgradeScript is Script {
 
         vm.startBroadcast(deployerPrivateKey);
 
+        // Deploy new implementation
         MultiVault newImplementation = new MultiVault();
         console.log("New implementation deployed at:", address(newImplementation));
 
+        // Prepare initializeV2 call to grant DEFAULT_ADMIN_ROLE to deployer
+        bytes memory initData = abi.encodeWithSignature("initializeV2()");
+
+        // Upgrade and initialize
         MultiVault proxy = MultiVault(payable(proxyAddress));
-        proxy.upgradeToAndCall(address(newImplementation), "");
+        proxy.upgradeToAndCall(address(newImplementation), initData);
 
         console.log("Proxy upgraded successfully");
         console.log("Proxy address:", proxyAddress);
         console.log("New implementation:", address(newImplementation));
+        console.log("Admin role granted to:", vm.addr(deployerPrivateKey));
 
         vm.stopBroadcast();
     }

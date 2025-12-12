@@ -68,6 +68,12 @@ contract PayoutExecutor is UUPSUpgradeable, AccessControlUpgradeable, PausableUp
         multiVault = _multiVault;
     }
 
+    /// @notice Reinitializer for migrating from Ownable to AccessControl
+    /// @dev Call this during upgrade from v1 to v2 to grant admin role to deployer
+    function initializeV2() public reinitializer(2) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+    }
+
     function createOneTimePayout(
         address recipient,
         address token,

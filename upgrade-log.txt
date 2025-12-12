@@ -1,3 +1,0 @@
-Upgrade completed at Sun Dec  7 18:14:17 UTC 2025
-Network: Base Mainnet
-Proxy: 0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439

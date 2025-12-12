@@ -9,6 +9,8 @@ MultiVault enables DAOs and teams to create isolated treasury vaults with custom
 ## Documentation
 
 - **[Vault Model Specification](docs/VAULT_MODEL.md)** - Comprehensive technical documentation covering vault lifecycle, data model, configuration rules, and integration guidelines for developers and auditors
+- **[Role System Design](docs/ROLE_SYSTEM.md)** - Complete role hierarchy, access control matrix, and privilege escalation protection mechanisms
+- **[Governance Patterns](docs/GOVERNANCE_PATTERNS.md)** - Recommended governance configurations for DAOs, companies, and hybrid organizations
 
 ## Key Features
 
@@ -17,7 +19,9 @@ MultiVault enables DAOs and teams to create isolated treasury vaults with custom
 - **Flexible Thresholds**: Set custom approval requirements per vault
 - **Programmable Payouts**: One-time, vesting, and streaming payments
 - **USDC Transfers**: Native Base Pay integration
-- **Fully Upgradeable**: UUPS proxy pattern
+- **Role-Based Access Control**: Granular permissions with GLOBAL_ADMIN, VAULT_ADMIN, OPERATOR, and PAUSER roles
+- **Emergency Pause**: Circuit breaker for security incidents
+- **Fully Upgradeable**: UUPS proxy pattern with safe storage layout
 
 ## Use Cases
 

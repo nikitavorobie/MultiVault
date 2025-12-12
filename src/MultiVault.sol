@@ -2,8 +2,9 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./interfaces/IMultiVault.sol";
@@ -11,15 +12,22 @@ import "./interfaces/IMultiVault.sol";
 contract MultiVault is
     IMultiVault,
     UUPSUpgradeable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
+    AccessControlUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable
 {
     using SafeERC20 for IERC20;
 
     // ============================================
+    // Roles
+    // ============================================
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+
+    // ============================================
     // Storage Layout (UUPS Upgradeability)
     // ============================================
-    // Slots 0-99: OpenZeppelin Upgradeable (Ownable, ReentrancyGuard, UUPS)
+    // Slots 0-99: OpenZeppelin Upgradeable (AccessControl, ReentrancyGuard, Pausable, UUPS)
     // Slots 100-149: Controller-level data
     // Slots 150-199: Reserved for future expansion (__gap)
 
@@ -37,7 +45,7 @@ contract MultiVault is
 
     // Reserved for future controller-level features
     // Example: cross-vault policies, global limits, fee collection
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     error InvalidSigner();
     error SignerAlreadyExists();
@@ -57,15 +65,24 @@ contract MultiVault is
     error InvalidVaultName();
     error VaultAlreadyArchived();
     error CannotArchiveVaultWithActiveProposals();
+    error Unauthorized();
 
     function initialize() public initializer {
-        __Ownable_init();
+        __AccessControl_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         proposalExpirationPeriod = 30 days;
     }
 
-    function createVault(string calldata name, string calldata metadataRef) external override onlyOwner returns (uint256) {
+    function getVaultAdminRole(uint256 vaultId) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked("VAULT_ADMIN", vaultId));
+    }
+
+    function createVault(string calldata name, string calldata metadataRef) external override whenNotPaused returns (uint256) {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert Unauthorized();
         if (bytes(name).length == 0) revert InvalidVaultName();
 
         uint256 vaultId = vaultCount++;
@@ -80,11 +97,16 @@ contract MultiVault is
             active: true
         });
 
+        _grantRole(getVaultAdminRole(vaultId), msg.sender);
+
         emit VaultCreated(vaultId, name, metadataRef);
         return vaultId;
     }
 
-    function addSigner(uint256 vaultId, address signer, uint256 weight) external override onlyOwner {
+    function addSigner(uint256 vaultId, address signer, uint256 weight) external override whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(getVaultAdminRole(vaultId), msg.sender)) {
+            revert Unauthorized();
+        }
         if (!vaults[vaultId].active) revert VaultNotFound();
         if (signer == address(0)) revert InvalidSigner();
         if (vaultSigners[vaultId][signer].active) revert SignerAlreadyExists();
@@ -103,7 +125,10 @@ contract MultiVault is
         emit VaultSignerAdded(vaultId, signer, weight);
     }
 
-    function removeSigner(uint256 vaultId, address signer) external override onlyOwner {
+    function removeSigner(uint256 vaultId, address signer) external override whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(getVaultAdminRole(vaultId), msg.sender)) {
+            revert Unauthorized();
+        }
         if (!vaults[vaultId].active) revert VaultNotFound();
         if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
 
@@ -125,7 +150,10 @@ contract MultiVault is
         emit VaultSignerRemoved(vaultId, signer);
     }
 
-    function setThreshold(uint256 vaultId, uint256 newThreshold) external override onlyOwner {
+    function setThreshold(uint256 vaultId, uint256 newThreshold) external override whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(getVaultAdminRole(vaultId), msg.sender)) {
+            revert Unauthorized();
+        }
         if (!vaults[vaultId].active) revert VaultNotFound();
         if (newThreshold == 0 || newThreshold > vaults[vaultId].totalWeight) revert InvalidThreshold();
 
@@ -135,7 +163,10 @@ contract MultiVault is
         emit VaultThresholdUpdated(vaultId, oldThreshold, newThreshold);
     }
 
-    function updateSignerWeight(uint256 vaultId, address signer, uint256 newWeight) external onlyOwner {
+    function updateSignerWeight(uint256 vaultId, address signer, uint256 newWeight) external whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(getVaultAdminRole(vaultId), msg.sender)) {
+            revert Unauthorized();
+        }
         if (!vaults[vaultId].active) revert VaultNotFound();
         if (!vaultSigners[vaultId][signer].active) revert SignerNotFound();
         if (newWeight == 0) revert InvalidWeight();
@@ -147,7 +178,8 @@ contract MultiVault is
         emit VaultSignerWeightUpdated(vaultId, signer, oldWeight, newWeight);
     }
 
-    function archiveVault(uint256 vaultId) external onlyOwner {
+    function archiveVault(uint256 vaultId) external whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert Unauthorized();
         if (!vaults[vaultId].active) revert VaultAlreadyArchived();
 
         vaults[vaultId].active = false;
@@ -168,7 +200,7 @@ contract MultiVault is
         uint256 amount,
         address token,
         bytes calldata data
-    ) external override returns (uint256) {
+    ) external override whenNotPaused returns (uint256) {
         if (!vaults[vaultId].active) revert VaultNotFound();
         if (!vaultSigners[vaultId][msg.sender].active) revert InvalidSigner();
         if (recipient == address(0)) revert InvalidRecipient();
@@ -193,7 +225,7 @@ contract MultiVault is
         return proposalId;
     }
 
-    function approveProposal(uint256 proposalId) external override {
+    function approveProposal(uint256 proposalId) external override whenNotPaused {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
@@ -211,7 +243,7 @@ contract MultiVault is
         emit ProposalApproved(proposalId, msg.sender, signerWeight, proposal.approvalWeight);
     }
 
-    function executeProposal(uint256 proposalId) external override nonReentrant {
+    function executeProposal(uint256 proposalId) external override nonReentrant whenNotPaused {
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
@@ -242,7 +274,8 @@ contract MultiVault is
         emit ProposalExecuted(proposalId, proposal.recipient, proposal.amount);
     }
 
-    function cancelProposal(uint256 proposalId) external override onlyOwner {
+    function cancelProposal(uint256 proposalId) external override whenNotPaused {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert Unauthorized();
         Proposal storage proposal = proposals[proposalId];
         if (proposal.createdAt == 0) revert ProposalNotFound();
         if (proposal.executed) revert ProposalAlreadyExecuted();
@@ -268,7 +301,23 @@ contract MultiVault is
         return hasApproved[proposalId][signer];
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function pause() external {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(PAUSER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
+        _pause();
+    }
+
+    function unpause() external {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(PAUSER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
+        _unpause();
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert Unauthorized();
+    }
 
     receive() external payable {}
 }

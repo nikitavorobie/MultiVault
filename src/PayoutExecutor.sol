@@ -2,12 +2,15 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
+contract PayoutExecutor is UUPSUpgradeable, AccessControlUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
+
+    bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     enum PayoutType {
         OneTime,
@@ -57,8 +60,11 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function initialize(address _multiVault) public initializer {
-        __Ownable_init();
+        __AccessControl_init();
         __UUPSUpgradeable_init();
+        __Pausable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         multiVault = _multiVault;
     }
 
@@ -66,7 +72,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         address recipient,
         address token,
         uint256 amount
-    ) external onlyMultiVault returns (uint256) {
+    ) external onlyMultiVault whenNotPaused returns (uint256) {
         if (amount == 0) revert InvalidAmount();
 
         uint256 payoutId = payoutCount++;
@@ -95,7 +101,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         uint256 startTime,
         uint256 duration,
         uint256 cliffDuration
-    ) external onlyMultiVault returns (uint256) {
+    ) external onlyMultiVault whenNotPaused returns (uint256) {
         if (amount == 0) revert InvalidAmount();
         if (duration == 0) revert InvalidTimeRange();
         if (startTime < block.timestamp) startTime = block.timestamp;
@@ -127,7 +133,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         uint256 amount,
         uint256 startTime,
         uint256 duration
-    ) external onlyMultiVault returns (uint256) {
+    ) external onlyMultiVault whenNotPaused returns (uint256) {
         if (amount == 0) revert InvalidAmount();
         if (duration == 0) revert InvalidTimeRange();
         if (startTime < block.timestamp) startTime = block.timestamp;
@@ -152,7 +158,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         return payoutId;
     }
 
-    function claim(uint256 payoutId) external {
+    function claim(uint256 payoutId) external whenNotPaused {
         Payout storage payout = payouts[payoutId];
         if (payout.startTime == 0) revert PayoutNotFound();
         if (payout.cancelled) revert PayoutAlreadyCancelled();
@@ -173,7 +179,7 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         emit PayoutClaimed(payoutId, claimable);
     }
 
-    function cancelPayout(uint256 payoutId) external onlyMultiVault {
+    function cancelPayout(uint256 payoutId) external onlyMultiVault whenNotPaused {
         Payout storage payout = payouts[payoutId];
         if (payout.startTime == 0) revert PayoutNotFound();
         if (payout.cancelled) revert PayoutAlreadyCancelled();
@@ -210,7 +216,23 @@ contract PayoutExecutor is UUPSUpgradeable, OwnableUpgradeable {
         return payouts[payoutId];
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function pause() external {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(PAUSER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
+        _pause();
+    }
+
+    function unpause() external {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(PAUSER_ROLE, msg.sender)) {
+            revert Unauthorized();
+        }
+        _unpause();
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) revert Unauthorized();
+    }
 
     receive() external payable {}
 }

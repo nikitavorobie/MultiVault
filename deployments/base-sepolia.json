@@ -3,34 +3,40 @@
   "chainId": 84532,
   "rpcUrl": "https://sepolia.base.org",
   "explorer": "https://sepolia.basescan.org",
+  "deployedAt": "2025-12-12T11:59:58Z",
   "contracts": {
     "MultiVault": {
-      "proxy": "0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439",
-      "implementation": "0xF3eD7F568dAe09536768081a4BFcf44E55703529",
+      "proxy": "0xc8c7F4E139B10711f9a9cbf827De58437C001d37",
+      "implementation": "0xDEc5f0c12Ba35cA3347B837fD3178bB72d2F7213",
       "deployer": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635",
-      "deployedAt": "2024-11-20T00:00:00Z",
-      "gasUsed": 2750711,
-      "verified": true
+      "verified": true,
+      "explorerUrl": "https://sepolia.basescan.org/address/0xc8c7F4E139B10711f9a9cbf827De58437C001d37"
     },
     "PayoutExecutor": {
-      "proxy": "0x5828179353Ad884B10f40Be9122747e1415d7Ea1",
-      "implementation": "0x5762F53B44192AA4eF0999a5240898e4d059dDb1",
+      "proxy": "0xCCc16fC6e3cb9a8260689a15fd9687C857D6Ccf7",
+      "implementation": "0x9519091a012651Dd9Bc2b7202aB4D9875db0494C",
       "deployer": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635",
-      "deployedAt": "2024-11-20T00:00:00Z",
-      "gasUsed": 2750711,
-      "verified": true
+      "verified": true,
+      "explorerUrl": "https://sepolia.basescan.org/address/0xCCc16fC6e3cb9a8260689a15fd9687C857D6Ccf7"
     }
   },
-  "upgrades": [
-    {
-      "contract": "MultiVault",
-      "fromImplementation": "0xD06B5813305db8d6DAD601E6bAf1699Ac93EFD9E",
-      "toImplementation": "0xF3eD7F568dAe09536768081a4BFcf44E55703529",
-      "upgradedAt": "2025-12-07T16:30:00Z",
-      "upgrader": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635",
-      "gasUsed": 3399951,
-      "description": "Added vault archival and signer weight update functionality",
-      "txHash": ""
+  "accessControl": {
+    "enabled": true,
+    "version": "OpenZeppelin v4.9.6",
+    "roles": {
+      "DEFAULT_ADMIN_ROLE": {
+        "description": "Global administrator with full control",
+        "holder": "0xBd53dA0eb0B80061dbF942D8CE98EfC4Dc0e0635"
+      },
+      "OPERATOR_ROLE": {
+        "description": "Can create vaults and manage proposals"
+      },
+      "PAUSER_ROLE": {
+        "description": "Can pause/unpause contracts in emergencies"
+      },
+      "VAULT_ADMIN": {
+        "description": "Per-vault dynamic roles for vault-specific operations"
+      }
     }
-  ]
+  }
 }

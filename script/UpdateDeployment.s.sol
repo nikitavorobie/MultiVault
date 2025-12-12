@@ -12,7 +12,6 @@ contract UpdateDeploymentScript is Script {
 
         console.log("=== Deployment Info ===");
         console.log("Proxy:", proxyAddress);
-        console.log("Owner:", proxy.owner());
         console.log("Vault Count:", proxy.getVaultCount());
         console.log("Proposal Count:", proxy.getProposalCount());
         console.log("Proposal Expiration Period:", proxy.proposalExpirationPeriod());

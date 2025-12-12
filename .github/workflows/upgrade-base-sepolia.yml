@@ -2,11 +2,6 @@ name: Upgrade Base Sepolia
 
 on:
   workflow_dispatch:
-    inputs:
-      proxy_address:
-        description: 'Proxy address to upgrade'
-        required: true
-        default: '0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439'
 
 jobs:
   upgrade:
@@ -27,12 +22,22 @@ jobs:
       - name: Build contracts
         run: forge build
 
+      - name: Read deployment addresses
+        id: addresses
+        run: |
+          MULTIVAULT_PROXY=$(jq -r '.contracts.MultiVault.proxy' deployments/base-sepolia.json)
+          EXECUTOR_PROXY=$(jq -r '.contracts.PayoutExecutor.proxy' deployments/base-sepolia.json)
+          echo "multivault_proxy=$MULTIVAULT_PROXY" >> $GITHUB_OUTPUT
+          echo "executor_proxy=$EXECUTOR_PROXY" >> $GITHUB_OUTPUT
+          echo "📍 MultiVault Proxy: $MULTIVAULT_PROXY"
+          echo "📍 PayoutExecutor Proxy: $EXECUTOR_PROXY"
+
       - name: Upgrade contract
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
           BASE_SEPOLIA_RPC_URL: ${{ secrets.BASE_SEPOLIA_RPC_URL }}
           BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
-          PROXY_ADDRESS: ${{ github.event.inputs.proxy_address }}
+          PROXY_ADDRESS: ${{ steps.addresses.outputs.multivault_proxy }}
         run: |
           forge script script/Upgrade.s.sol:UpgradeScript \
             --rpc-url $BASE_SEPOLIA_RPC_URL \

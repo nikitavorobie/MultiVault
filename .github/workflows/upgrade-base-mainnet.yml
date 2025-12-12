@@ -6,10 +6,6 @@ on:
       confirm:
         description: 'Type "UPGRADE" to confirm mainnet upgrade'
         required: true
-      proxy_address:
-        description: 'Proxy address to upgrade'
-        required: true
-        default: '0xB4FD2402c97c0F2E38B3Be91596aDe8927A36439'
 
 jobs:
   upgrade:
@@ -36,12 +32,22 @@ jobs:
       - name: Build contracts
         run: forge build
 
+      - name: Read deployment addresses
+        id: addresses
+        run: |
+          MULTIVAULT_PROXY=$(jq -r '.contracts.MultiVault.proxy' deployments/base-mainnet.json)
+          EXECUTOR_PROXY=$(jq -r '.contracts.PayoutExecutor.proxy' deployments/base-mainnet.json)
+          echo "multivault_proxy=$MULTIVAULT_PROXY" >> $GITHUB_OUTPUT
+          echo "executor_proxy=$EXECUTOR_PROXY" >> $GITHUB_OUTPUT
+          echo "📍 MultiVault Proxy: $MULTIVAULT_PROXY"
+          echo "📍 PayoutExecutor Proxy: $EXECUTOR_PROXY"
+
       - name: Upgrade contract
         env:
           PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
           BASE_MAINNET_RPC_URL: ${{ secrets.BASE_MAINNET_RPC_URL }}
           BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
-          PROXY_ADDRESS: ${{ github.event.inputs.proxy_address }}
+          PROXY_ADDRESS: ${{ steps.addresses.outputs.multivault_proxy }}
         run: |
           forge script script/Upgrade.s.sol:UpgradeScript \
             --rpc-url $BASE_MAINNET_RPC_URL \
@@ -59,7 +65,7 @@ jobs:
         run: |
           echo "Upgrade completed at $(date)" >> upgrade-log.txt
           echo "Network: Base Mainnet" >> upgrade-log.txt
-          echo "Proxy: ${{ github.event.inputs.proxy_address }}" >> upgrade-log.txt
+          echo "Proxy: ${{ steps.addresses.outputs.multivault_proxy }}" >> upgrade-log.txt
 
       - name: Commit upgrade log
         uses: stefanzweifel/git-auto-commit-action@v5

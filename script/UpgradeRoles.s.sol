@@ -6,6 +6,11 @@ import "../src/MultiVault.sol";
 import "../src/PayoutExecutor.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
+// Interface for UUPS upgradeable proxies
+interface IUUPSProxy {
+    function upgradeToAndCall(address newImplementation, bytes calldata data) external;
+}
+
 contract UpgradeRolesScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -27,15 +32,15 @@ contract UpgradeRolesScript is Script {
         // Prepare initializeV2 call to grant DEFAULT_ADMIN_ROLE to deployer
         bytes memory initData = abi.encodeWithSignature("initializeV2()");
 
-        // Upgrade MultiVault proxy
+        // Upgrade MultiVault proxy using interface (avoids ABI conflicts)
         console.log("Upgrading MultiVault proxy...");
-        MultiVault vaultProxy = MultiVault(payable(proxyAddress));
+        IUUPSProxy vaultProxy = IUUPSProxy(proxyAddress);
         vaultProxy.upgradeToAndCall(address(newVaultImpl), initData);
         console.log("MultiVault proxy upgraded");
 
-        // Upgrade PayoutExecutor proxy
+        // Upgrade PayoutExecutor proxy using interface (avoids ABI conflicts)
         console.log("Upgrading PayoutExecutor proxy...");
-        PayoutExecutor executorProxy = PayoutExecutor(payable(executorProxyAddress));
+        IUUPSProxy executorProxy = IUUPSProxy(executorProxyAddress);
         executorProxy.upgradeToAndCall(address(newExecutorImpl), initData);
         console.log("PayoutExecutor proxy upgraded");
 

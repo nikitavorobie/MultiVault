@@ -5,6 +5,11 @@ import "forge-std/Script.sol";
 import "../src/MultiVault.sol";
 import "../src/PayoutExecutor.sol";
 
+// Interface for UUPS upgradeable proxies
+interface IUUPSProxy {
+    function upgradeToAndCall(address newImplementation, bytes calldata data) external;
+}
+
 contract UpgradeScript is Script {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
@@ -19,8 +24,8 @@ contract UpgradeScript is Script {
         // Prepare initializeV2 call to grant DEFAULT_ADMIN_ROLE to deployer
         bytes memory initData = abi.encodeWithSignature("initializeV2()");
 
-        // Upgrade and initialize
-        MultiVault proxy = MultiVault(payable(proxyAddress));
+        // Upgrade and initialize using interface (avoids ABI conflicts)
+        IUUPSProxy proxy = IUUPSProxy(proxyAddress);
         proxy.upgradeToAndCall(address(newImplementation), initData);
 
         console.log("Proxy upgraded successfully");
